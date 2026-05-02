@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build macOS binaries
+        run: |
+          mkdir -p dist
+          GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/nosleep-darwin-arm64 .
+          GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/nosleep-darwin-x64 .
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+
+          gh release create "${tag}" \
+            dist/nosleep-darwin-arm64 \
+            dist/nosleep-darwin-x64 \
+            --target "${GITHUB_SHA}" \
+            --title "${tag}" \
+            --generate-notes
