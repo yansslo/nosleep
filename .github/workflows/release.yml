@@ -24,11 +24,13 @@ jobs:
 
       - name: Build release binaries
         run: |
+          version="${GITHUB_REF_NAME#v}"
+          ldflags="-s -w -X main.version=${version}"
           mkdir -p dist
-          GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/nosleep-darwin-arm64 .
-          GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/nosleep-darwin-x64 .
-          GOOS=windows GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/nosleep-windows-arm64.exe .
-          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/nosleep-windows-x64.exe .
+          GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="${ldflags}" -o dist/nosleep-darwin-arm64 .
+          GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="${ldflags}" -o dist/nosleep-darwin-x64 .
+          GOOS=windows GOARCH=arm64 go build -trimpath -ldflags="${ldflags}" -o dist/nosleep-windows-arm64.exe .
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="${ldflags}" -o dist/nosleep-windows-x64.exe .
 
       - name: Create GitHub release
         env:
