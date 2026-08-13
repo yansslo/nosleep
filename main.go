@@ -122,6 +122,7 @@ func newRootCommand() *cobra.Command {
 			return showStatus()
 		},
 	})
+	rootCmd.AddCommand(newAutoCommand())
 
 	return rootCmd
 }
@@ -344,16 +345,14 @@ func stopSession() error {
 	}
 
 	if state == nil {
-		fmt.Println("nosleep is not running.")
-		return nil
+		return reportNoManualSession()
 	}
 
 	if !isPIDAlive(state.PID) || !isSleepPreventionPID(state.PID) {
 		if err := removeState(); err != nil {
 			return err
 		}
-		fmt.Println("nosleep is not running.")
-		return nil
+		return reportNoManualSession()
 	}
 
 	if err := terminateState(state); err != nil {
@@ -364,6 +363,19 @@ func stopSession() error {
 	return nil
 }
 
+func reportNoManualSession() error {
+	autoState, err := activeAutoPreventionState()
+	if err != nil {
+		return err
+	}
+	if autoState != nil {
+		fmt.Println("No manual session is running. Automatic prevention is active; run \"nosleep auto disable\" to turn it off.")
+		return nil
+	}
+	fmt.Println("nosleep is not running.")
+	return nil
+}
+
 func showStatus() error {
 	state, err := activeState()
 	if err != nil {
@@ -371,22 +383,60 @@ func showStatus() error {
 	}
 
 	if state == nil {
-		fmt.Println("nosleep is not running.")
+		autoState, autoErr := activeAutoPreventionState()
+		if autoErr != nil {
+			return autoErr
+		}
+		if autoState == nil {
+			fmt.Println("nosleep is not running.")
+			return nil
+		}
+		fmt.Printf("nosleep is running automatically for %s.\n", formatDetectedAgents(autoState.Agents))
 		return nil
 	}
 
 	if state.Indefinite {
 		fmt.Printf("nosleep is running indefinitely. PID: %d.\n", state.PID)
-		return nil
+	} else {
+		fmt.Printf(
+			"nosleep is running for %s. Ends at %s. PID: %d.\n",
+			state.Duration.Input,
+			formatLocalTime(state.Duration.EndsAt),
+			state.PID,
+		)
 	}
 
-	fmt.Printf(
-		"nosleep is running for %s. Ends at %s. PID: %d.\n",
-		state.Duration.Input,
-		formatLocalTime(state.Duration.EndsAt),
-		state.PID,
-	)
+	autoState, autoErr := activeAutoPreventionState()
+	if autoErr != nil {
+		return autoErr
+	}
+	if autoState != nil {
+		fmt.Printf("Automatic prevention is also active for %s.\n", formatDetectedAgents(autoState.Agents))
+	}
 	return nil
+}
+
+func activeAutoPreventionState() (*autoMonitorState, error) {
+	config, err := readConfig()
+	if err != nil || !config.AutoAgents {
+		return nil, err
+	}
+	state, err := readAutoState()
+	if err != nil || !isAutoMonitorAlive(state) || !state.Preventing {
+		return nil, err
+	}
+	return state, nil
+}
+
+func formatDetectedAgents(agents []detectedAgent) string {
+	labels := make([]string, 0, len(agents))
+	for _, agent := range agents {
+		labels = append(labels, fmt.Sprintf("%s (PID %d)", agent.Name, agent.PID))
+	}
+	if len(labels) == 0 {
+		return "a recently detected coding agent"
+	}
+	return strings.Join(labels, ", ")
 }
 
 func formatLocalTime(isoDate string) string {
