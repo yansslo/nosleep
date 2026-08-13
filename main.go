@@ -6,13 +6,10 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -44,6 +41,14 @@ type startOptions struct {
 }
 
 func main() {
+	if handled, err := runPlatformHelper(os.Args[1:]); handled {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if err := newRootCommand().Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -55,7 +60,7 @@ func newRootCommand() *cobra.Command {
 
 	rootCmd := &cobra.Command{
 		Use:           "nosleep [duration]",
-		Short:         "Prevent your Mac from sleeping with a friendly caffeinate wrapper.",
+		Short:         "Prevent your computer from sleeping.",
 		Version:       version,
 		SilenceErrors: true,
 		SilenceUsage:  true,
@@ -233,32 +238,13 @@ func parseHumanDuration(input string) (time.Duration, error) {
 	return time.Duration(days * float64(24*time.Hour)), nil
 }
 
-func isPIDAlive(pid int) bool {
-	err := syscall.Kill(pid, 0)
-	return err == nil || errors.Is(err, syscall.EPERM)
-}
-
-func processCommand(pid int) string {
-	output, err := exec.Command("ps", "-p", strconv.Itoa(pid), "-o", "comm=").Output()
-	if err != nil {
-		return ""
-	}
-
-	return strings.TrimSpace(string(output))
-}
-
-func isCaffeinatePID(pid int) bool {
-	command := processCommand(pid)
-	return command == "caffeinate" || filepath.Base(command) == "caffeinate"
-}
-
 func activeState() (*sessionState, error) {
 	state, err := readState()
 	if err != nil || state == nil {
 		return state, err
 	}
 
-	if !isPIDAlive(state.PID) || !isCaffeinatePID(state.PID) {
+	if !isPIDAlive(state.PID) || !isSleepPreventionPID(state.PID) {
 		if err := removeState(); err != nil {
 			return nil, err
 		}
@@ -268,30 +254,9 @@ func activeState() (*sessionState, error) {
 	return state, nil
 }
 
-func terminateState(state *sessionState) error {
-	process, err := os.FindProcess(state.PID)
-	if err != nil {
-		return removeState()
-	}
-
-	if err := process.Signal(syscall.SIGTERM); err != nil {
-		return removeState()
-	}
-
-	for attempt := 0; attempt < 20; attempt++ {
-		time.Sleep(100 * time.Millisecond)
-		if !isPIDAlive(state.PID) {
-			return removeState()
-		}
-	}
-
-	_ = process.Signal(syscall.SIGKILL)
-	return removeState()
-}
-
 func startSession(options startOptions) error {
-	if runtime.GOOS != "darwin" {
-		return errors.New("nosleep currently only supports macOS")
+	if !isSupportedPlatform() {
+		return errors.New("nosleep currently only supports macOS and Windows")
 	}
 
 	if options.Duration != "" && options.DangerouslyIndefinite {
@@ -330,13 +295,11 @@ func startSession(options startOptions) error {
 		}
 	}
 
-	args := append([]string{}, caffeinateFlags...)
-	if duration != nil {
-		args = append(args, "-t", strconv.FormatInt(duration.Seconds, 10))
+	cmd, args, err := sleepPreventionCommand(duration)
+	if err != nil {
+		return err
 	}
-
-	cmd := exec.Command("caffeinate", args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	configureDetachedProcess(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return err
@@ -346,7 +309,7 @@ func startSession(options startOptions) error {
 	time.Sleep(150 * time.Millisecond)
 
 	if !isPIDAlive(pid) {
-		return errors.New("caffeinate exited immediately. Is it available on this Mac?")
+		return errors.New("the sleep-prevention process exited immediately")
 	}
 
 	if err := cmd.Process.Release(); err != nil {
@@ -385,7 +348,7 @@ func stopSession() error {
 		return nil
 	}
 
-	if !isPIDAlive(state.PID) || !isCaffeinatePID(state.PID) {
+	if !isPIDAlive(state.PID) || !isSleepPreventionPID(state.PID) {
 		if err := removeState(); err != nil {
 			return err
 		}

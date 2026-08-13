@@ -22,11 +22,13 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build macOS binaries
+      - name: Build release binaries
         run: |
           mkdir -p dist
           GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/nosleep-darwin-arm64 .
           GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/nosleep-darwin-x64 .
+          GOOS=windows GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/nosleep-windows-arm64.exe .
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/nosleep-windows-x64.exe .
 
       - name: Create GitHub release
         env:
@@ -37,6 +39,8 @@ jobs:
           gh release create "${tag}" \
             dist/nosleep-darwin-arm64 \
             dist/nosleep-darwin-x64 \
+            dist/nosleep-windows-arm64.exe \
+            dist/nosleep-windows-x64.exe \
             --target "${GITHUB_SHA}" \
             --title "${tag}" \
             --generate-notes

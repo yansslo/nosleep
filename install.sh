@@ -7,8 +7,12 @@ binary_name="${NOSLEEP_BINARY_NAME:-nosleep}"
 
 case "$(uname -s)" in
   Darwin) os="darwin" ;;
+  MINGW*|MSYS*|CYGWIN*)
+    echo "On Windows, install nosleep with install.ps1 from PowerShell." >&2
+    exit 1
+    ;;
   *)
-    echo "nosleep currently only supports macOS." >&2
+    echo "nosleep currently only supports macOS and Windows." >&2
     exit 1
     ;;
 esac
