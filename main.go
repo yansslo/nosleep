@@ -15,7 +15,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "0.1.0"
+// version is overridden from the release tag with -ldflags "-X main.version=...".
+var version = "dev"
 
 var caffeinateFlags = []string{"-d", "-i", "-m"}
 

@@ -40,6 +40,16 @@ func TestParseHumanDurationRejectsInvalidInput(t *testing.T) {
 	}
 }
 
+func TestRootCommandUsesBuildVersion(t *testing.T) {
+	originalVersion := version
+	version = "1.2.3"
+	t.Cleanup(func() { version = originalVersion })
+
+	if got := newRootCommand().Version; got != version {
+		t.Fatalf("root command version = %q, want %q", got, version)
+	}
+}
+
 func TestClassifyAgent(t *testing.T) {
 	tests := []struct {
 		name       string
