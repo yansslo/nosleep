@@ -1,7 +1,8 @@
 # ☕ nosleep
 
-`nosleep` is a tiny macOS CLI that starts and stops detached `caffeinate`
-sessions, so your Mac stays awake even after you close the terminal.
+`nosleep` is a tiny macOS and Windows CLI that starts and stops detached
+sleep-prevention sessions, so your computer stays awake even after you close
+the terminal.
 
 Inspired by [Amphetamine](https://apps.apple.com/us/app/amphetamine/id937984704).
 
@@ -11,6 +12,13 @@ Installs the latest release to `~/.local/bin/nosleep`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/yansslo/nosleep/main/install.sh | bash
+```
+
+On Windows, run this in PowerShell to install the latest release to
+`%USERPROFILE%\.local\bin\nosleep.exe`:
+
+```powershell
+irm https://raw.githubusercontent.com/yansslo/nosleep/main/install.ps1 | iex
 ```
 
 ## Usage
@@ -48,18 +56,19 @@ about it.
 
 ## How it Works
 
-`nosleep` uses macOS's built-in `caffeinate` command under the hood. When you
-start a session, it launches `caffeinate` as a detached background process with
-flags to prevent display, idle, and disk sleep. For timed sessions, `nosleep`
-passes the parsed duration to `caffeinate -t` in seconds.
+On macOS, `nosleep` launches the built-in `caffeinate` command as a detached
+background process with flags to prevent display, idle, and disk sleep. On
+Windows, it launches a detached copy of itself that uses the native
+`SetThreadExecutionState` API to keep the system and display awake. Timed
+sessions end automatically on both platforms.
 
 `nosleep` stores its active session state in `~/.nosleep/state.json`. The state
-file records the detached `caffeinate` process PID, start time, arguments, and
-duration metadata when the session is timed.
+file records the detached sleep-prevention process PID, start time, arguments,
+and duration metadata when the session is timed.
 
 `nosleep status` reads that file, checks whether the recorded PID is still a
-live `caffeinate` process, and removes stale state if the process already ended.
-`nosleep stop` uses the same state file to terminate the active session.
+live sleep-prevention process, and removes stale state if the process already
+ended. `nosleep stop` uses the same state file to terminate the active session.
 
 ## Development
 
