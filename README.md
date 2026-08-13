@@ -32,6 +32,9 @@ nosleep start --duration 30m
 nosleep start --dangerously-indefinite
 nosleep status
 nosleep stop
+nosleep auto enable
+nosleep auto status
+nosleep auto disable
 ```
 
 Durations use Go duration syntax like `30m`, `2h`, and `1h30m`. `nosleep` also
@@ -39,6 +42,31 @@ accepts day values like `1d`.
 
 Pass `--override` when starting a session to stop the active `nosleep` session
 and replace it with the new one.
+
+## Automatic Agent Detection
+
+Automatic agent detection is disabled by default. Opt in with:
+
+```sh
+nosleep auto enable
+```
+
+When enabled, `nosleep` starts a small per-user background monitor at login. The
+monitor prevents sleep whenever a local Claude Code or Codex CLI process is
+running, then releases sleep prevention shortly after the last matching process
+ends. Check it with `nosleep auto status` or turn it off with
+`nosleep auto disable`.
+
+Detection is based on local process lifetimes, so an open interactive agent
+session counts even while it is waiting for input. Persistent Codex
+`app-server`, `mcp-server`, completion, and code-mode helper processes are
+excluded to avoid keeping the computer awake merely because an editor or host
+application is open.
+
+On macOS the monitor is installed as the per-user LaunchAgent
+`com.yansslo.nosleep.agent-monitor`. On Windows it is installed as the per-user
+scheduled task `nosleep-agent-monitor`. The setting and runtime state remain in
+`~/.nosleep`, alongside manual session state.
 
 ## Why?
 
